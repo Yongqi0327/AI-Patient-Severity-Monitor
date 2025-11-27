@@ -36,11 +36,11 @@
             font-weight: 300;
         }
 
-        .start-btn {
+        .start-btn, .toggle-btn {
             display: block;
             width: 100%;
             max-width: 300px;
-            margin: 0 auto 30px auto;
+            margin: 10px auto;
             background: linear-gradient(45deg, #4CAF50, #45a049);
             color: white;
             border: none;
@@ -52,7 +52,7 @@
             box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
 
-        .start-btn:hover {
+        .start-btn:hover, .toggle-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
         }
@@ -60,7 +60,7 @@
         .canvas-container {
             width: 100%;
             max-width: 500px;
-            margin: 0 auto 30px auto;
+            margin: 20px auto;
             border-radius: 15px;
             overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
@@ -148,7 +148,6 @@
         }
     </style>
 </head>
-
 <body>
     <div class="container">
         <h1>🤖 AI Patient Severity Monitor</h1>
@@ -158,6 +157,7 @@
         </div>
 
         <button type="button" class="start-btn" onclick="init()">🚀 Start Detection</button>
+        <button type="button" class="toggle-btn" onclick="toggleCamera()">🔄 Toggle Camera</button>
 
         <div id="status" class="status loading" style="display:none;">Initializing...</div>
 
@@ -180,18 +180,14 @@
     <script>
         const URL = "./my_model/";
         let model, webcam, ctx, labelContainer, maxPredictions;
+        let facingMode = "user"; // default front camera
 
         function showNotification(msg) {
             const notif = document.createElement("div");
             notif.className = "notification";
-            notif.innerHTML = `
-                <strong>⚠ Camera Issue</strong><br>${msg}
-            `;
+            notif.innerHTML = `<strong>⚠ Camera Issue</strong><br>${msg}`;
             document.body.appendChild(notif);
-
-            setTimeout(() => {
-                notif.remove();
-            }, 6000);
+            setTimeout(() => notif.remove(), 6000);
         }
 
         async function init() {
@@ -219,33 +215,14 @@
                     return;
                 }
 
-                // Setup webcam - responsive size
-                const containerWidth = document.querySelector('.canvas-container').offsetWidth;
-                const size = Math.min(containerWidth, 500);
-                const flip = true;
-                webcam = new tmPose.Webcam(size, size, flip);
+                await setupWebcam(); // Setup camera with current facingMode
 
-                try {
-                    await webcam.setup(); // Permission request
-                    await webcam.play();
-                } catch (err) {
-                    statusEl.className = "status error";
-                    statusEl.textContent = "📹 Camera permission denied.";
-                    showNotification("Please allow camera access in browser settings and refresh the page.");
-                    return;
-                }
-
-                // Canvas setup
                 const canvas = document.getElementById("canvas");
-                canvas.width = size;
-                canvas.height = size;
+                const containerWidth = document.querySelector('.canvas-container').offsetWidth;
+                canvas.width = Math.min(containerWidth, 500);
+                canvas.height = canvas.width;
                 ctx = canvas.getContext("2d");
-                
-                // Make canvas responsive
-                canvas.style.width = '100%';
-                canvas.style.height = 'auto';
 
-                // Prediction labels
                 labelContainer = document.getElementById("label-container");
                 labelContainer.innerHTML = "";
                 for (let i = 0; i < maxPredictions; i++) {
@@ -267,6 +244,32 @@
             }
         }
 
+        async function setupWebcam() {
+            if (webcam) {
+                webcam.stop();
+                webcam = null;
+            }
+            const containerWidth = document.querySelector('.canvas-container').offsetWidth;
+            const size = Math.min(containerWidth, 500);
+            const flip = facingMode === "user"; // flip for front camera
+            webcam = new tmPose.Webcam(size, size, flip);
+
+            try {
+                await webcam.setup({ facingMode }); // front or back
+                await webcam.play();
+            } catch (err) {
+                const statusEl = document.getElementById("status");
+                statusEl.className = "status error";
+                statusEl.textContent = "📹 Camera permission denied.";
+                showNotification("Please allow camera access in browser settings and refresh the page.");
+            }
+        }
+
+        function toggleCamera() {
+            facingMode = facingMode === "user" ? "environment" : "user";
+            setupWebcam();
+        }
+
         async function loop() {
             webcam.update();
             await predict();
@@ -281,7 +284,6 @@
                 const prob = (prediction[i].probability * 100).toFixed(1);
                 const className = prediction[i].className;
                 const icon = prob > 70 ? "🔴" : prob > 40 ? "🟡" : "⚪";
-
                 labelContainer.childNodes[i].innerHTML =
                     `${icon} <strong>${className}</strong>: ${prob}%`;
             }
