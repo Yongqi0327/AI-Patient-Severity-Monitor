@@ -58,11 +58,18 @@
         }
 
         .canvas-container {
-            display: inline-block;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto 30px auto;
             border-radius: 15px;
             overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            margin-bottom: 30px;
+        }
+
+        #canvas {
+            width: 100%;
+            height: auto;
+            display: block;
         }
 
         #label-container {
@@ -212,8 +219,9 @@
                     return;
                 }
 
-                // Setup webcam
-                const size = 350;
+                // Setup webcam - responsive size
+                const containerWidth = document.querySelector('.canvas-container').offsetWidth;
+                const size = Math.min(containerWidth, 500);
                 const flip = true;
                 webcam = new tmPose.Webcam(size, size, flip);
 
@@ -232,6 +240,10 @@
                 canvas.width = size;
                 canvas.height = size;
                 ctx = canvas.getContext("2d");
+                
+                // Make canvas responsive
+                canvas.style.width = '100%';
+                canvas.style.height = 'auto';
 
                 // Prediction labels
                 labelContainer = document.getElementById("label-container");
